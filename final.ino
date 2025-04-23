@@ -92,20 +92,19 @@ void go_to_depth(int target)
     {
       // set motor to go down
       Serial.println("going down...")
-      myservo.write(75); 
+      myservo.write(80); 
     }
     else
     {
       // going up...
       Serial.println("going up...");
-      myservo.write(106);
+      myservo.write(100);
     }
     // making sure to not bombard motor
     delay(50);
   }
   //stopping movement once complete
   Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
-  myservo.write(91); 
 }
 
 void hover(int temp_target)
