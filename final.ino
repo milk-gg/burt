@@ -91,11 +91,13 @@ void go_to_depth(int target)
     if (temp_depth < target)
     {
       // set motor to go down
+      Serial.println("going down...")
       myservo.write(75); 
     }
     else
     {
       // going up...
+      Serial.println("going up...");
       myservo.write(106);
     }
     // making sure to not bombard motor
@@ -212,18 +214,12 @@ long get_depth()
   return temp_depth;
 } 
   
-// borrowed, getting temperature from thermistor
-long get_temperature() 
-{
+float get_temperature() {
   int adcVal = analogRead(A0);
-  // Calculate voltage
-  long v = adcVal * 5.0 / 1024;
-  // Calculate resistance value of thermistor
-  long Rt = 10 * v / (5 - v);
-  // Calculate temperature (Kelvin)
-  long tempK = 1 / (log(Rt / 10) / 3950 + 1 / (273.15 + 25));
-  // Calculate temperature (Celsius)
-  long tempC = tempK - 273.15;
+  float v = adcVal * 5.0 / 1024.0;  
+  float Rt = 10.0 * v / (5.0 - v); 
+  float tempK = 1.0 / (log(Rt / 10.0) / 3950.0 + 1.0 / 298.15); 
+  float tempC = tempK - 273.15;
   return tempC;
 }
   
