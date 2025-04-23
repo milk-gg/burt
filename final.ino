@@ -91,8 +91,8 @@ void go_to_depth(int target)
     if (temp_depth < target)
     {
       // set motor to go down
-      Serial.println("going down...")
-      myservo.write(70); 
+      Serial.println("going down...");
+      myservo.write(65); 
     }
     else
     {
@@ -128,7 +128,7 @@ void hover(int temp_target)
         Serial.println("hover complete");
         break;
       }
-      // stop motor if in range
+      // motor hover
       myservo.write(80);
     }
     else
