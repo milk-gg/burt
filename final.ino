@@ -100,8 +100,8 @@ void go_to_depth(int target)
       Serial.println("going up...");
       myservo.write(106);
     }
-    // making sure to not bombard motor and serial print
-    delay(1000);
+    // making sure to not bombard motor
+    delay(50);
   }
   //stopping movement once complete
   Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
@@ -142,8 +142,8 @@ void hover(int temp_target)
       // correcting position
       go_to_depth(temp_target);
     }
-    // to not bombard motor and serial print
-    delay(1000);
+    // to not bombard motor
+    delay(50);
   }
 }
 
