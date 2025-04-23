@@ -100,7 +100,7 @@ void go_to_depth(int target)
     delay(50);
   }
   //stopping movement once complete
-  Serial.print("going to depth "); Serial.print(target); Serial.print("successful"); 
+  Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
   myservo.write(91); 
 }
 
