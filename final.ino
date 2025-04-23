@@ -85,8 +85,10 @@ void go_to_depth(int target)
   // while pressure is not within 5cm...
   while (abs(get_depth() - target) > 5)
   {
-    long current_depth = get_depth();
-    if (current_depth < target)
+    long temp_depth = get_depth();
+    Serial.print("depth = "); Serial.println(temp_depth);
+
+    if (temp_depth < target)
     {
       // set motor to go down
       myservo.write(75); 
@@ -113,10 +115,11 @@ void hover(int temp_target)
 
   while (true)
   {
-    long local_depth = get_depth();
+    long temp_depth = get_depth();
+    Serial.print("depth = "); Serial.println(temp_depth);
 
     // if depth is within 5 cm error, check if countdown should continue
-    if (abs(local_depth - temp_target) <= 5)
+    if (abs(temp_depth - temp_target) <= 5)
     {
       // stop motor and break when countdown finished
       if (millis() - start_time >= hover_duration)
@@ -205,8 +208,8 @@ long get_depth()
 {
   long raw_data = read_sensor();
   long rounded_data = round(raw_data / 1000.0); 
-  long local_depth = interpolate_depth(raw_data); 
-  return local_depth;
+  long temp_depth = interpolate_depth(raw_data); 
+  return temp_depth;
 } 
   
 // borrowed, getting temperature from thermistor
