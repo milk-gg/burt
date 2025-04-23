@@ -82,7 +82,7 @@ void go_to_depth(int target)
 {
   Serial.print("Going to depth "); Serial.println(target);
 
-  // while pressure is not within 5cm...
+  // while  is not within 5cm...
   while (abs(get_depth() - target) > 5)
   {
     long temp_depth = get_depth();
@@ -92,13 +92,13 @@ void go_to_depth(int target)
     {
       // set motor to go down
       Serial.println("going down...")
-      myservo.write(80); 
+      myservo.write(70); 
     }
     else
     {
       // going up...
       Serial.println("going up...");
-      myservo.write(100);
+      myservo.write(106);
     }
     // making sure to not bombard motor
     delay(50);
@@ -126,11 +126,10 @@ void hover(int temp_target)
       if (millis() - start_time >= hover_duration)
       {
         Serial.println("hover complete");
-        myservo.write(91); 
         break;
       }
       // stop motor if in range
-      myservo.write(91);
+      myservo.write(80);
     }
     else
     {
