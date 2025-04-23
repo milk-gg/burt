@@ -58,11 +58,13 @@ void loop()
       log_data(30, get_temperature());
       continue;
     }
-    // if for loop is on its second iteration, wait for a button press to confirm MATE Float is in water
+    // if for loop is on its second iteration, wait for a button press to confirm MATE Float is in water and take temp
     if (i == 1)
     {
       Serial.println("press button once MATE Float is in the water");
       while (digitalRead(button) == HIGH) {}
+      log_data(-20, get_temperature());
+      continue;
     }
     go_to_depth(target_depths[i]);  
     hover(target_depths[i]);  
@@ -71,6 +73,7 @@ void loop()
     if (i == target_depths_size - 1)
     {
       go_to_depth(5);
+      Serial.println("succesfull");
     }
   }
 }
