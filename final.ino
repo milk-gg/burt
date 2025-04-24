@@ -1,4 +1,4 @@
-/*
+  /*
   For MATEROV 2025 Season
 */
 
@@ -16,10 +16,17 @@ const int out = 2;
 const int sck = 3;
 const int button = 4;
   
-//target depths
+// target depths
 const int target_depths_size = 4;
 const int target_depths[target_depths_size] = {0, 20, 110, 210};
   
+// motor values 
+const int motor_stop = 91;
+const int max_motor_down = 73;
+const int max_motor_up = 101;
+int motor_hover = 84;
+const int max_error_range = 60; // used for map() function as the upper boumd
+
 void setup() 
 {
   Serial.begin(9600);
@@ -29,7 +36,7 @@ void setup()
   pinMode(sck, OUTPUT);
   pinMode(button, INPUT_PULLUP);
 
-  //initializing motor
+  // initializing motor
   delay(1000);
   myservo.attach(9,1000,2000);
   Serial.println("Initializing ESC");
@@ -58,7 +65,7 @@ void loop()
       log_data(30, get_temperature());
       continue;
     }
-    // if for loop is on its second iteration, wait for a button press to confirm MATE Float is in water and take temp
+    // if for loop is on its second iteration, wait for a button press to confirm MATE Float is in water and log data
     if (i == 1)
     {
       Serial.println("press button once MATE Float is in the water");
@@ -66,39 +73,49 @@ void loop()
       log_data(-20, get_temperature());
       continue;
     }
+
     go_to_depth(target_depths[i]);  
     hover(target_depths[i]);  
     log_data(-get_depth(), get_temperature()); 
 
+    // when at end of loop, return to the surface
     if (i == target_depths_size - 1)
     {
+      Serial.println("ascending to surface...");
       go_to_depth(5);
-      Serial.println("succesfull");
+      Serial.println("successful");
     }
   }
 }
 
 void go_to_depth(int target)
 {
-  Serial.print("Going to depth "); Serial.println(target);
+  Serial.print("going to depth "); Serial.println(target);
 
-  // while  is not within 5cm...
+  int speed; 
+  int error;
+
+  // while depth is not within 5cm...
   while (abs(get_depth() - target) > 5)
   {
     long temp_depth = get_depth();
     Serial.print("depth = "); Serial.println(temp_depth);
 
-    if (temp_depth < target)
+    error = temp_depth - target;
+
+    // if depth is lower than target go down, based on map()
+    if (error < 0)
     {
-      // set motor to go down
-      Serial.println("going down...");
-      myservo.write(65); 
+      speed = map(abs(error), 0, 50, motor_hover, max_motor_down);
+      speed = constrain(speed, max_motor_down, motor_hover);
+      myservo.write(speed);
     }
     else
     {
-      // going up...
-      Serial.println("going up...");
-      myservo.write(106);
+      // if depth is higher than target go up based on map()
+      speed = map(abs(error), 0, max_error_range, motor_hover, max_motor_up);
+      speed = constrain(speed, motor_hover, max_motor_up);
+      myservo.write(speed);
     }
     // making sure to not bombard motor
     delay(50);
@@ -111,7 +128,7 @@ void hover(int temp_target)
 {
   Serial.print("hovering at "); Serial.println(temp_target);
 
-  const unsigned long hover_duration = 10000; 
+  const unsigned long hover_duration = 2000; 
   unsigned long start_time = millis();
 
   while (true)
@@ -149,13 +166,13 @@ void hover(int temp_target)
 long read_sensor() 
 {
   // wait for the current reading to finish
-  while (digitalRead(2)) {}
+  while (digitalRead(out)) {}
   
   // read 24 bits
   long result = 0;
   for (int i = 0; i < 24; i++) {
-    digitalWrite(3, HIGH);
-    digitalWrite(3, LOW);
+    digitalWrite(sck, HIGH);
+    digitalWrite(sck, LOW);
     result = result << 1;
     if (digitalRead(2)) {
       result++;
@@ -168,7 +185,7 @@ long read_sensor()
   // pulse the clock line 3 times to start the next pressure reading
   for (char i = 0; i < 3; i++) 
   { 
-    digitalWrite(out, HIGH);
+    digitalWrite(sck, HIGH);
     digitalWrite(sck, LOW);
   }
   
@@ -179,40 +196,34 @@ long read_sensor()
 // interpolate depth based on data set
 long interpolate_depth(long raw_value) 
 {
-  long rounded_value = round(raw_value / 1000.0);
-  
-  // if below dataset, return lowest depth from set
-  if (rounded_value <= raw_values[0]) return depths[0];  
-  
-  // if above dataset, extrapolate using the slope of the last two data
-  if (rounded_value >= raw_values[data_index - 1]) 
-  {      
-    long slope = (long)(depths[data_index - 1] - depths[data_index - 2]) / (raw_values[data_index - 1] - raw_values[data_index - 2]);
-    return depths[data_index - 1] + slope * (rounded_value - raw_values[data_index - 1]);
+  if (raw_value <= raw_values[0]) return depths[0];
+
+  if (raw_value >= raw_values[data_index - 1]) 
+  {
+    float slope = (float) (depths[data_index - 1] - depths[data_index - 2]) / (raw_values[data_index - 1] - raw_values[data_index - 2]);
+    return depths[data_index - 1] + slope * (raw_value - raw_values[data_index - 1]);
   }
-  
-  // find the correct range for interpolation
+
   for (int i = 0; i < data_index - 1; i++) 
   {
-    if (rounded_value >= raw_values[i] && rounded_value <= raw_values[i + 1]) 
+    if (raw_value >= raw_values[i] && raw_value <= raw_values[i + 1]) 
     {
-      long slope = (long) (depths[i + 1] - depths[i]) / (raw_values[i + 1] - raw_values[i]);
-      return depths[i] + slope * (rounded_value - raw_values[i]);
+      float slope = (float) (depths[i + 1] - depths[i]) / (raw_values[i + 1] - raw_values[i]);
+      return depths[i] + slope * (raw_value - raw_values[i]);
     }
-  }
+  }                                                       
   return 0;
 }
 
-// getting depth via read_sensor() and interpolate_depth() functions
 long get_depth() 
 {
   long raw_data = read_sensor();
   long rounded_data = round(raw_data / 1000.0); 
-  long temp_depth = interpolate_depth(raw_data); 
-  return temp_depth;
-} 
+  return interpolate_depth(rounded_data); 
+}
   
-float get_temperature() {
+float get_temperature() 
+{
   int adcVal = analogRead(A0);
   float v = adcVal * 5.0 / 1024.0;  
   float Rt = 10.0 * v / (5.0 - v); 
@@ -222,11 +233,9 @@ float get_temperature() {
 }
   
 // prints data
-void log_data(long temp_depth, long temp_temp)
+void log_data(long temp_depth, float temp_temp)
 {
-  Serial.print("depth (cm):");
   Serial.print(temp_depth);
-  Serial.print(',');
-  Serial.print("temp:");
+  Serial.print(",");
   Serial.println(temp_temp);
-} 
+}
