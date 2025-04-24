@@ -1,6 +1,4 @@
-  /*
-  For MATEROV 2025 Season
-*/
+// For 2025 MATEROV Season
 
 #include <Servo.h>
 #include <SPI.h>
