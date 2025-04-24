@@ -82,6 +82,7 @@ void loop()
       Serial.println("ascending to surface...");
       go_to_depth(5);
       Serial.println("successful");
+      myservo.write(motor_stop);
     }
   }
 }
