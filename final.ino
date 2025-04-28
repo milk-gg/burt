@@ -6,7 +6,7 @@ Servo myservo;
   
 // data (truncated raw values and their corresponding depth in cm)
 const int data_index = 22;
-const long raw_values[data_index] = {8316, 8300, 8703, 8830, 9115, 9335, 9744, 10000, 10370, 10655, 11071, 11430, 11790, 12080, 12327, 12745, 13112, 13358, 13630, 13960, 14255, 14694};
+const int raw_values[data_index] = {8316, 8300, 8703, 8830, 9115, 9335, 9744, 10000, 10370, 10655, 11071, 11430, 11790, 12080, 12327, 12745, 13112, 13358, 13630, 13960, 14255, 14694};
 const int depths[data_index] = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210};
   
 // pins
@@ -22,7 +22,7 @@ const int target_depths[target_depths_size] = {0, 20, 110, 210};
 const int motor_stop = 91;
 const int max_motor_down = 73;
 const int max_motor_up = 101;
-int motor_hover = 84;
+const int motor_hover = 79;
 const int max_error_range = 60; // used for map() function as the upper boumd
 
 void setup() 
@@ -51,6 +51,7 @@ void loop()
   // waiting for button to be pressed to begin
   Serial.println("press button to start");
   while (digitalRead(button) == HIGH) {}
+  delay(300);
 
   // goes through every target depth
   for (int i = 0; i < target_depths_size; i++)
@@ -60,6 +61,7 @@ void loop()
     {
       Serial.println("press button again to take air temp");
       while (digitalRead(button) == HIGH) {}
+      delay(300);
       log_data(30, get_temperature());
       continue;
     }
@@ -68,6 +70,7 @@ void loop()
     {
       Serial.println("press button once MATE Float is in the water");
       while (digitalRead(button) == HIGH) {}
+      delay(300);
       log_data(-20, get_temperature());
       continue;
     }
@@ -117,7 +120,7 @@ void go_to_depth(int target)
       myservo.write(speed);
     }
     // making sure to not bombard motor
-    delay(50);
+    delay(20);
   }
   //stopping movement once complete
   Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
