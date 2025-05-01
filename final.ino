@@ -24,6 +24,9 @@ const int max_error_range = 60; // used for map() function as the upper boumd
 // atmospheric pressure based on pressure in Long Beach from https://barometricpressure.today/cities/long-beach-us
 float atmospheric pressure = 101270.0;
 
+//what is the distance from the pressure sensor to the bottom of toobie to calculate what depth it needs to go to???
+//todo, add pool depth and get the target depths from that and distance from pressure to bottom of toobie
+
 void setup() 
 {
   Serial.begin(9600);
@@ -72,7 +75,11 @@ void loop()
       continue;
     }
 
-    go_to_depth(target_depths[i]);  
+    if (go_to_depth(target_depths[i]) = 1)
+    {
+      Serial.println("restarting program");
+      break;
+    }
     hover(target_depths[i]);  
     log_data(-get_depth(), get_temperature()); 
 
@@ -80,14 +87,17 @@ void loop()
     if (i == target_depths_size - 1)
     {
       Serial.println("ascending to surface...");
-      go_to_depth(5);
-      Serial.println("successful");
+      if (go_to_depth(20) = 1)
+      {
+        
+        break;
+      }
       myservo.write(motor_stop);
     }
   }
 }
 
-void go_to_depth(int target)
+int go_to_depth(int target)
 {
   Serial.print("going to depth "); Serial.println(target);
 
@@ -122,7 +132,14 @@ void go_to_depth(int target)
     // how often the motor speed is changed
     delay(10);
   }
+  if (millis() > start_time + timeout) 
+  {
+    Serial.print("going to depth "); Serial.print(target); Serial.println(" unsuccessful"); 
+    return 1;
+  }
+  
   //stopping movement once complete
+  return 0;
   Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
 }
 
@@ -193,3 +210,5 @@ void log_data(float temp_depth, float temp_temp)
   Serial.print(",");
   Serial.println(temp_temp);
 }
+
+
