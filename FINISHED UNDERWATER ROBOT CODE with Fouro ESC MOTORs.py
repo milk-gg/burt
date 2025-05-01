@@ -1,401 +1,243 @@
-import pygame #  This library allows us to read joystick positions and buttons
-import time   #  This is to allow delays in our code
-from gpiozero import LED  #  GPIOZERO is the library which allows us to remotely control our Raspberry Pi GPIO pins
-from gpiozero import PWMLED #  GPIO function to turn on and off HIGH / LOW GPIO pins
-from gpiozero import Button #  GPIO function to read a GPIO pin
-from gpiozero import Servo  #  GPIO function to activate the thrusters.
-                            #  ESC's are controlled like a servo using PWM.
-#  Raising the PWM pulse width will increase the speed and lowering the pulse with will decrease the speed.
-#  Sending a POSITIVE PWM VALUE will tell the motor to turn CLOCKWISE.
-#  Sending a NEGATIVE PWM VALUE will tell the motor to turn COUNTER CLOCKWISE or ANTI CLOCKWISE.
+import pygame # Load the Pygame library to work with a gamepad
+import time  #  Load the time library for time based commands
+from time import sleep  #  Load the sleep command from the time library to allow for delays
+from gpiozero import LED  #  Load the LED function from the gpiozero library for access to the Remote GPIO
+from gpiozero import PWMLED #  Load the PWMLED function from the gpiozero library for access to the Remote GPIO
+from gpiozero import Button  #  Load the Button function from the gpiozero library for access to the Remote GPIO
+from gpiozero import Servo  #  Load the Servo function from the gpiozero library for access to the Remote GPIO
+from gpiozero.pins.pigpio import PiGPIOFactory  #  Load the PiPIOFactory library to use Remote GPIO
 
-from gpiozero.pins.pigpio import PiGPIOFactory  #  This library allows us to access the remote GPIO pins
-                                                #  calling them locally using their Factory On Board pin numbers.
+factory = PiGPIOFactory(host='192.168.0.202')  #  Establish a networked connection to a Remote GPIO on IP Address 192.168.0.202
 
-from time import sleep  #  This imports the sleep function from time.
-#  I used this in troubleshooting, but not using it in the current code.
+UpCam = LED(13, pin_factory=factory)  #  Set UpCam as in LED pin 13 for control of the camera relay to switch between the up and down cameras
+LeftHorizontal = Servo(20, pin_factory=factory)  #  Set LeftHorizontal as a Servo on pin 20
+RightHorizontal = Servo(21, pin_factory=factory)  # Set RightHorizontal as a Servo on pin 21
+Left45 = Servo(19, pin_factory=factory)  #  Set Left45 as a Servo on pin 19
+Right45 = Servo(26, pin_factory=factory)  #  Set Right45 as a Servo on pin 26
+twist = Servo(5, pin_factory=factory)  #  Set twist as a Servo on pin 5 for the arm which we were unsuccessful at properly waterproofing
+hand = Servo(6, pin_factory=factory)  #  Set hand as a Servo on pin 6 for the arm which we were unsuccessful at properly waterproofing
+cam = 0  #  Set default camera value to 0 so the bottom camera will be turned on.
+claw = 0.00  #  Set the claw default value to Zero for it's home position
+arm = 0.00  #  Set the arm default value to Zero for it's home position
 
-factory = PiGPIOFactory(host='192.168.0.130')  #  Using the PiGPIOFactory library connect all GPIO pins to a RPI
-                                               #  on the network at IP address 192.168.0.126.  
-red = LED(20, pin_factory=factory)  #  Test output pin to turn on and off an LED
+pygame.joystick.init()  #  Initialize the pygame joystick interface
+joysticks = [pygame.joystick.Joystick(x) for x in range(pygame.joystick.get_count())]  # Search for all joysticks and assign them each a number
+print(joysticks)  #  Print the joysticks found
+pygame.init()  # Initialize the pygame interface
+direction = int  # Set a variable for the joystick axis direction as an integer. Values we will be looking for are 0, 1, 2, 3.  Left stick = 0 & 1.  Right stick = 2 & 3.
+power = float(0.00)  # Set a float variable for the power we will be reading from the joystick axis's.
+pwm = float(0.00)  # Set a float variable for the pwm values we will be outputting to the ESC's.
 
-# PINS: 6, 12, 16, 19.
-# 6: 
-
-LFA0 = LED(2, pin_factory=factory)       #  Left Front
-LFA1 = LED(3, pin_factory=factory)
-LFE1 = Servo(6, pin_factory=factory)    #  Regular motor controller pins used.
-
-RFA2 = LED(5, pin_factory=factory)       #  Right Front
-RFA3 = LED(7, pin_factory=factory)
-RFE2 = Servo(12, pin_factory=factory)    #  Regular motor controller pins used.
-
-LRB0 = LED(8, pin_factory=factory)       #  Left Rear
-LRB1 = LED(9, pin_factory=factory)
-LRE3 = Servo(16, pin_factory=factory)   #  Regular motor controller pins used.
-
-RRB2 = LED(11, pin_factory=factory)      #  Right Rear
-RRB3 = LED(13, pin_factory=factory)
-RRE4 = Servo(19, pin_factory=factory)   #  Regular motor controller pins used.
-# 
-LHA0 = LED(23, pin_factory=factory)      #  Left Horizontal
-LHA1 = LED(24, pin_factory=factory)
-LHE1 = Servo(26, pin_factory=factory)   #  Regular motor controller pins used.
-
-RHA2 = LED(22, pin_factory=factory)      #  Right Horizontal
-RHA3 = LED(21, pin_factory=factory) 
-RHE2 = Servo(25, pin_factory=factory)    #  This is the only pin that will be required to control a thruster.
-                                         #  It is setup as a Servo PWM pin.
-
-pygame.joystick.init()  #  Initialize the pygame joystick part of the program
-joysticks = [pygame.joystick.Joystick(x) for x in range(pygame.joystick.get_count())]
-#  Check how many joysticks are connected and assign them a number for reading access.
-print(joysticks)  #  Print on the Shell the Joysticks connected
-pygame.init()  # Initialize the pygame video system.
-               #  Pygame is a game library which allows us to utilize the joysticks.
-               #  Pygame can also be used to create video games.
-
-direction = int  #  Assign an integer to direction.  This will be a positive or a negative number
-                 #  we will use to determine which direction each stick has been moved.
-                 #  NEGATIVE NUMBERS = UP and LEFT     and    POSITIVE NUMBERS = DOWN and RIGHT
-power = float(0.00)  #  Assign a varible of power as a float.  This will be used to do calculations with PWM.
-pwm = float(0.00)  #  Assign a variable of pwm as a float.
-                   #  This will be the output value to control the motors speed
-                   #  and for the SERVO(speed and direction)
-
-#  All Subroutines need to be defined before they are called in Python.
-#  The program will actually jump to the While Loop but keep these Subroutines in memory.
-#  The programming in the While Loop will call these Subroutines based on Joytick Input Changes.
-#  So in short all our Program is doing is keeping an eye on the joystick for any changes,
-#  then based on those changes running this specific list of Subroutines.  FOREVER
-def left_forward():  #Subroutines
-    pwm = abs(power)  #  Calculate the absolute value of the power variable and assigning it to pwm.
-                      #  This way our pwm value is forward.
-
-   
-    LFE1.value=pwm
+def left_forward():  #  Left horizontal forward function
+    pwm = abs(power)   # Take the absolute value of the power function coming from the joystick axis and assign it to pwm  
+    LeftHorizontal.value=-pwm  #  Send a negative pwm value to the left horizontal esc
     
-def left_reverse():
-    LFE1.value=-power
+def left_reverse():  #  Left horizontal reverse function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    LeftHorizontal.value=pwm  #  Send a positive pwm value to the left horizontal esc
 
-def left_forward_reverse_stop():
-    LFE1.value=0
+def left_forward_reverse_stop():  # Left horizontal stop function
+    LeftHorizontal.value=0  # Send a full stop pwm value to the left horizontal esc
+
+def left_up():  # Left vertical up function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    Left45.value=pwm  #  Send a positive pwm value to the left vertical esc
     
+def left_down():  # Left vertical down function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    Left45.value=-pwm  #  Send a negative pwm value to the left vertical esc
+
+def left_up_down_stop():  # Left vertical stop function
+    Left45.value=0  # Send a full stop pwm value to the left vertical esc
     
-
-def left_up():
-    pwm = abs(power)  
-
-
-    LRE3.value=pwm
+def right_forward():  # Right horizontal forward function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    RightHorizontal.value=pwm  #  Send a positive pwm value to the right horizontal esc
+      
+def right_reverse():  # Right horizontal reverse function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    RightHorizontal.value=-pwm  #  Send a negative pwm value to the right horizontal esc
     
+def right_forward_reverse_stop():  #  Right horizontal stop function
+    RightHorizontal.value=0  #  Send a full stop pwm value to the right horizontal esc
 
+def right_up():  # Right vertical up function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    Right45.value=-pwm  #  Send a negative pwm value to the right vertical esc
     
-def left_down():
-    pwm = abs(power)  
-#     LFA0.off()
-#     LFA1.on()
-    LRE3.value=-pwm
-#     
-#  
+def right_down():  #  Right vertical down function
+    pwm = abs(power)  # Take the absolute value of the power function coming from the joystick axis and assign it to pwm 
+    Right45.value=pwm  # Send a positive pwm value to the right vertical esc
+     
+def right_up_down_stop():  # Right vertical stop function
+    Right45.value=0  #  Send a full stop pwm value to the right vertical esc
 
-def left_up_down_stop():
-   
-    LRE3.value=0
+def blue():  # Extra blue joystick button not used
+    print('Blue')  #  print on screen "Blue"
     
+def green():  # Extra green joystick button not used
+    print('Green')  #  print on screen "Green"
     
-    LRE3.value=0
+def orange():  # Extra orange joystick button not used
+    print('Orange')  #  print on screen "Orange"
     
-def right_forward():
-    pwm = abs(power)  #  Calculate the absolute value of the power variable and assigning it to pwm.
-                      #  This way our pwm value is forward.
-
-   
-    RFE2.value=pwm  #  This being a SERVO pin all we need to use to active a SERVO motor is send it a pwm signal.
-    #  The pwm signal will give the motor DIRECTION and SPEED.
-    #  SPEED is determined by a value of 0 to 1 and DIRECTION is determined by a + or - pwm value.
-    #  The joystick Y axis moving foward / up produces a negative number, using the pwm = abs(power)
-    #  we can turn it positive making the motor turn in the FORWARD DIRECTION
-  
-def right_reverse():
-    pwm = abs(power)
-    RFE2.value=-pwm#4.value=-power  #  The joystick Y Axis is providing a positive number
-    #  so we add a negative before power to reverse the direction of the motor
-    #  -power
-    #  We could also rewire the motor the speed controller to reverse the direction,
-    #  but this is a much easier way to manipulate the direction.
-
-def right_forward_reverse_stop():
-    RHE2.value=0  #  Setting the pwm value to 0  STOPS the thrust motor
-
-
-def right_up():
-    pwm = abs(power)  
-#     RFA2.on()
-#     RFA3.off()
-    RRE4.value=pwm
+def red_stop():  #  Emergency Stop Setup on Red Button to stop all motors.  This was setup for the initial testing of the esc's, in case a motor got stuck on.
+    print('EMERGENCY STOP')  # print on screen "EMERGENCY STOP"
+    LeftHorizontal.value=0.00  #  Set pwm value for left horizontal esc to Zero
+    RightHorizontal.value=0.00  # Set pwm value for right horizontal esc to Zero
+    Left45.value=0.00  # Set pwm value for left vertical esc to Zero
+    Right45.value=0.00  #  Set pwm value for right vertical esc to Zero
     
+def button4():  #  Button 4 was assigned to open the claw
+    print('Open Claw ')  #  print Open Claw on screen to confirm command received
+    print (claw)  # print the claw value on screen to test how far open the claw is
+    hand.value=claw  # Send the claw servo the value to open to
 
     
-def right_down():
-    pwm = abs(power) 
-#     RFA2.off()
-#     RFA3.on()
-    RRE4.value=-pwm
-    
-    
-def right_up_down_stop():
-#     RFA2.off()
-#     RFA3.off()
-    RFE2.value=0
-    
-    RRB2.off()
-    RRB3.off()
-    RRE4.value=0
+def button5():  #  Button 5 was assigned to close the claw
+    print('Close Claw')  # print Close Claw on screen to confirm command received
+    print (claw)  # print the claw value on screen to test how far closed the claw is
+    hand.value=claw  #  Send the claw servo the value to close to
 
+    
+def button6():  # Button 6 was assigned to a servo to twist the arm clockwise
+    print('Twist Right')  #  Print Twist Right on screen to confirm command received
+    print (arm)  #  print the arm value on screen to test how far right the arm twists
+    twist.value=arm  #  Send the arm servo the value to turn to
+ 
+def button7():  #  Button 7 was assigned to a servo to twist the arm counter clockwise
+    print('Twist Left')  # Print Twist Left on the screen to confirm command received
+    print (arm)  # print the arm value on the screen to test how far left the arm twists
+    twist.value=arm  #  Send the arm servo the value to turn to
+    
+def camoff():  #  Turn off the camera relay or set it to LOW to view the bottom camera
+    print('Cam DOWN')  #  print Cam DOWN to confirm command received
+    UpCam.off()  #  Set the camera LED pin to LOW to connect the down camera relay contacts
+    
+    
+def camon():  # Turn on the camera relay or set it to HIGH to view the upper camera
+    print ('Cam UP')  #  print Cam UP to confirm command received
+    UpCam.on()  #  Set the camera LED pin to HIGH to connect the up camera relay contacts
 
-def blue():
-    print('Blue')
     
-def green():
-    print('Green')
-    
-def orange():
-    print('Orange')
-    
-def red_stop():
-    print('EMERGENCY STOP')  #  TURN OFF ALL PINS.  This comes in handy when making changes to the program
-                             #  and a motor won't stop spinning because a mistake in the code.
-    LFA0.off()
-    LFA1.off()
-    LFE1.value=0.00
-    
-    RFA2.off()
-    RFA3.off()
-    RFE2.value=0.00
-    
-    LRB0.off()
-    LRB1.off()
-    LRE3.value=0.00
-    
-    RRB2.off()
-    RRB3.off()
-    RRE4.value=0.00
-    
-    LHA0.off()
-    LHA1.off()
-    LHE1.value=0.00
-    
-    RHA2.off()
-    RHA3.off()
-    RHE2.value=0.00
+def button8():  #  Assigned to set the claw and arm servos to a home position
+    print('Button 8 SERVO HOME')  # print Button 8 SERVO HOME to confirm command received
+    twist.value=0.0  #  Set the arm servo to its home position
+    sleep(2)  #  sleep for 2 seconds to avoid overloading the 5 volt buss
+    hand.value=0.0  #  Set the hand servo to its home position
     
 
-def button4():
-    print('Button 4')  #  These buttons can be used to activate addition motors or devices.
+def button10():  # Extra joystick button not used
+    print('Button 10')
+    
+def button11():  # Extra joystick button not used
+    print('Button 11')
+    
+def hat_up():  # Extra joystick button not used
+    print('Hat Up')
+    
+def hat_down():  # Extra joystick button not used
+    print('Hat Down')
+    
+def hat_left():  # Extra joystick button not used
+    print('Hat Left')
 
-def button5():
-    print('Button 5')  #  These buttons can be used to activate addition motors or devices.
-
-def button6():
-    print('Button 6')  #  These buttons can be used to activate addition motors or devices.
+def hat_right():  # Extra joystick button not used
+    print('Hat Right')
     
-def button7():
-    print('Button 7')  #  These buttons can be used to activate addition motors or devices.
-
-def button8():
-    print('Button 8')  #  These buttons can be used to activate addition motors or devices.
+def hat_centered():  # Extra joystick button not used
+    print('Hat Centered')
     
-def button9():
-    print('Button 9')  #  These buttons can be used to activate addition motors or devices.
-
-def button10():
-    print('Button 10')  #  These buttons can be used to activate addition motors or devices.
-    
-def button11():
-    print('Button 11')  #  These buttons can be used to activate addition motors or devices.
-    
-def hat_up():  #  These Hat Subroutines could be used to level off the ROV if we were using 6 motors.
-#     LFA0.off()
-#     LFA1.off()
-    LFE1.value=.2
-#     
-#     RFA2.off()
-#     RFA3.off()
-    RFE2.value=.2
-    
-#     LRB0.on()
-#     LRB1.off()
-    LRE3.value=.2
-#     
-#     RRB2.off()
-#     RRB3.on()
-    RRE4.value=.2
-    
-def hat_down():
-    LFA0.on()
-    LFA1.off()
-    LFE1.value=.2
-    
-    RFA2.off()
-    RFA3.on()
-    RFE2.value=.2
-    
-    LRB0.off()
-    LRB1.off()
-    LRE3.value=.2
-    
-    RRB2.off()
-    RRB3.off()
-    RRE4.value=.2
-def hat_left():
-    LFA0.off()
-    LFA1.off()
-    LFE1.value=.2
-    
-    RFA2.on()
-    RFA3.off()
-    RFE2.value=.2
-    
-    LRB0.off()
-    LRB1.off()
-    LRE3.value=.2
-    
-    RRB2.off()
-    RRB3.on()
-    RRE4.value=.2
-def hat_right():
-    LFA0.on()
-    LFA1.off()
-    LFE1.value=.2
-    
-    RFA2.off()
-    RFA3.off()
-    RFE2.value=.2
-    
-    LRB0.off()
-    LRB1.on()
-    LRE3.value=.2
-    
-    RRB2.off()
-    RRB3.off()
-    RRE4.value=.2
-    
-def hat_centered():  #  When the Hat Switch is returned to center /  a Hat Switch release,
-                     #  this Subroutine will turn off all motors.
-    LFA0.off()
-    LFA1.off()
-    LFE1.value=0.00
-    
-    RFA2.off()
-    RFA3.off()
-    RFE2.value=0.00
-    
-    LRB0.off()
-    LRB1.off()
-    LRE3.value=0.00
-    
-    RRB2.off()
-    RRB3.off()
-    RRE4.value=0.00
-    
-    LHA0.off()
-    LHA1.off()
-    LHE1.value=0.00
-    
-    RHA2.off()
-    RHA3.off()
-    RHE2.value=0.00
-    
-while True:  #  This is the main part of the program that loops continuously until the program is stopped.
-             #  It receives joystick events and calls Subroutines for each event.
-    for event in pygame.event.get():  #  Using the pygame library, get a joystick event.
-                                      #  Any change in a button press or stick movement causes an event.
-
-        if event.type == pygame.JOYAXISMOTION:  #  If an event is a joystick moving, run the following code.
-            
-            direction = (event.axis) #  Assign the specific joystick axis direction to the direction variable
-            power = (event.value)    #  Assign how much the joystick was moved in the direction
-                                     #  to the power variable.
-            power = round(power, 2)  #  Round the power numbers to the Hundredths place,
-                                     #  so we can work with less digits.
-            power = (power/4)  #  Limit all motor speeds to 1/2 possible power by dividing by 2.
-            print (power)  #  Print the power level on the Shell
-            
+while True:  #  MAIN LOOP   continuously run the following commands
+    for event in pygame.event.get():  #  check if a joystick event occurred in pygame
+        if event.type == pygame.JOYAXISMOTION:  #  If the pygame event = joystick axis event         
+            direction = (event.axis)  # determine which axis was moved and assign it to direction
+            power = (event.value)  #  read the value of the axis and assign it to power
+            power = (power/4)  # divide the power by 4 and reassign it to power.  This is used to limit the esc's throughout the ROV.  A divide by 4 factor results in 25% maximum power to an esc.
+            power = round(power,2)  # Round the power results to 2 decimal points for easier to read and work with numbers
+            print (power, " ", direction)  # Display on the screen the power and axis direction number for testing and reference
             
             # LEFT MOTORS CODE
-            if direction == 1 and power < -0.02:  #  If the left stick is being pressed Up on it's Y axis.
-                                                  #  Check that the power is above the center for joystick error.
-                left_forward()  # Run the left_forward Subroutine
-            if direction == 1 and power  > 0.02:  #  If the left stick is being pressed Down on it's Y axis.
-                                                  #  Check that the power is above the center for joystick error.
-                left_reverse()  # Run the left_reverse Subroutine
-            if direction == 1 and abs((power) < 0.01) and abs((power) >-0.01): #  If the stick is not being pressed
-                                                                               #  Stop the Motor
-                left_forward_reverse_stop()  #  Run the motor left_forward_reverse_stop Subroutine
             
-            if direction == 0 and power < -0.02:  #  This is similar code for the X Axis of the left stick.
-                                                  #  This would allow two motors to move the ROV up and down.
+
+            if direction == 1 and power < -0.02: #   If the left stick is moved forward and the power is less than a - 0.02 for stick float run left_forward function
+                left_forward()
+            
+            if direction == 1 and power  > 0.02:  #  If the left stick is moved backwards and the power is greater than 0.02 for stick float run left_reverse function
+                left_reverse()
+            
+            if direction == 1 and abs((power) < 0.01) and abs((power) >-0.01):  # If the left stick is returned to center position then run the left_foward_reverse_stop function
+                left_forward_reverse_stop()
+            
+            if direction == 0 and power < -0.02:  #   If the left stick is moved left and the power is less than a - 0.02 for stick float run left_up function
                 left_up()
-            if direction == 0 and power > 0.02:
+            
+            if direction == 0 and power > 0.02:  #  If the left stick is moved right and the power is greater than 0.02 for stick float run left_down function
                 left_down()
-            if direction == 0 and abs((power) < 0.01) and abs((power) >-0.01):
+            
+            if direction == 0 and abs((power) < 0.01) and abs((power) >-0.01):  # If the left stick has been returned to center run the left_up_down_stop function
                 left_up_down_stop()
             
             
             #  RIGHT MOTORS CODE
-            if direction == 3 and power < -0.02:  #  Same as the left stick, just calling Subroutines for the
-                                                  #  Right Stick Motors
+            if direction == 3 and power < -0.02: #  If the right stick is moved forward and the power is less than a - 0.02 for stick float run right_forward function
                 right_forward()
-            if direction == 3 and power > 0.02:
-                right_reverse()
-            if direction == 3 and abs((power) < 0.01) and abs((power) >-0.01):
-                right_forward_reverse_stop()
             
-            if direction == 2 and power < -0.02:
-                right_down()
-            if direction == 2 and power > 0.02:
+            if direction == 3 and power > 0.02:  #  If the right stick is moved backwards and the power is greater than 0.02 for stick float run right_reverse function
+                right_reverse()
+            
+            if direction == 3 and abs((power) < 0.01) and abs((power) >-0.01):  # If the right stick is returned to center position then run the right_foward_reverse_stop function
+                right_forward_reverse_stop()
+                       
+            if direction == 2 and power > 0.02:  #   If the right stick is moved right and the power is greater than 0.02 for stick float run right_up function
                 right_up()
-            if direction == 2 and abs((power) < 0.01) and abs((power) >-0.01):
+                
+            if direction == 2 and power < -0.02:  #  If the right stick is moved left and the power is less than -0.02 for stick float run right_down function
+                right_down()
+            
+            if direction == 2 and abs((power) < 0.01) and abs((power) >-0.01):  # If the right stick has been returned to center run the right_up_down_stop function
                 right_up_down_stop()
                 
         
-        #  HAT LEVELING MOTORS CODE
-        if event.type == pygame.JOYHATMOTION:  #  If an event is a hat switch being pressed run the following code.
-            if event.value == (0, 0):
-                hat_centered()
-            if event.value == (1, 0):
-                hat_right()
-            if event.value == (-1, 0):
-                hat_left()
-            if event.value == (0, 1):
-                hat_up()
-            if event.value == (0, -1):
-                hat_down()
-        
-        #  EXTRA BUTTONS CODE
-        if event.type == pygame.JOYBUTTONDOWN:  # if an event is a button being pressed run the following code.
-            if event.button == 0:
+        if event.type == pygame.JOYBUTTONDOWN:  #  If the event type is a joystick button press then run the following
+            if event.button == 0:  #  if button 0 run blue function
                 blue()
-            if event.button == 1:
+            if event.button == 1:  #  if button 1 run green function
                 green()
-            if event.button == 2:
+            if event.button == 2:  # if button 2 run red_stop function
                 red_stop()  #  This is where the EMERGENCY STOP event is detected.
-            if event.button == 3:
+            if event.button == 3:  # if button 3 run orange function
                 orange()
-            if event.button == 4:
-                button4()
-            if event.button == 5:
-                button5()
-            if event.button == 6:
-                button6()
-            if event.button == 7:
-                button7()
-            if event.button == 8:
+            if event.button == 4:  # if button 4 open claw
+                claw = claw - .2   # make claw servo steps -.2 per button press
+                if claw < -.6:  # limit the servo steps to a maximum of -.6 to not over extend
+                    claw = -.6
+                button4()  # run button4 function
+            if event.button == 5:  # if button 5 close claw
+                claw = claw + .2  # make claw servo steps + .2 per button press
+                if claw > 1:  # limit the servo steps to a maximum of 1 to not close past closed
+                    claw = 1
+                button5()  # run button5 function
+            if event.button == 6: #  if button 6 twist arm clockwise
+                arm = arm + .2  #  make arm servo steps + .2 per button press
+                if arm > 1:  #  limit the servo steps to a maximum of 1 to not over rotate
+                    arm = 1
+                button6()  #  run button6 function
+            if event.button == 7:  # if button 7 twist arm counterclockwise
+                arm = arm - .2  # make arm servo steps - .2 per button press
+                if arm < -1:  # limit the servo steps to a maximum of 1 to not over rotate
+                    arm = -1
+                button7()  #run button7 function
+            if event.button == 8:  #  If button 8 run servo home code on button8 function
                 button8()
-            if event.button == 9:
-                button9()
-            if event.button == 10:
+            if event.button == 9:  # If button 9 is pressed and camera is off, turn on the top cam relay
+                if cam == 0:
+                    cam = 1
+                    camon()
+                else:
+                    cam = 0  # If button 9 is pressed and camera is on, turn off the top cam relay
+                    camoff()
+            if event.button == 10:  #  if button 10 run extra button10 function
                 button10()
-            if event.button == 11:
+            if event.button == 11:  # if button 11 run extra button11 function
                 button11()
