@@ -5,14 +5,14 @@
 Servo myservo;
   
 // pins
-const int temp = A0;
 const int pressure = A1;
+const int temp = A0;
 const int button = 4;
 const int servo = 9;
   
 // target depths
 const int target_depths_size = 4;
-const int target_depths[target_depths_size] = {0, 20, 110, 210};
+const int target_depths[target_depths_size] = {0, 20, 110, 210}; // example numbers if pool is 2.2m deep
   
 // motor values 
 const int motor_stop = 91;
@@ -21,17 +21,14 @@ const int max_motor_up = 101;
 const int motor_hover = 79;
 const int max_error_range = 60; // used for map() function as the upper boumd
 
-// atmospheric pressure based on pressure in Long Beach from https://barometricpressure.today/cities/long-beach-us
-float atmospheric pressure = 101270.0;
-
-//what is the distance from the pressure sensor to the bottom of toobie to calculate what depth it needs to go to???
-//todo, add pool depth and get the target depths from that and distance from pressure to bottom of toobie
+//atmospheric pressure from https://barometricpressure.today/cities/long-beach-us to calculate gauge pressure in get_depth()
+const int atmospheric_pressure = 101490.0;
 
 void setup() 
 {
   Serial.begin(9600);
 
-  // set pin
+  // set pins
   pinMode(button, INPUT_PULLUP);
 
   // initializing motor
@@ -75,11 +72,7 @@ void loop()
       continue;
     }
 
-    if (go_to_depth(target_depths[i]) = 1)
-    {
-      Serial.println("restarting program");
-      break;
-    }
+    go_to_depth(target_depths[i]);  
     hover(target_depths[i]);  
     log_data(-get_depth(), get_temperature()); 
 
@@ -87,28 +80,22 @@ void loop()
     if (i == target_depths_size - 1)
     {
       Serial.println("ascending to surface...");
-      if (go_to_depth(20) = 1)
-      {
-        
-        break;
-      }
+      go_to_depth(5);
+      Serial.println("successful");
       myservo.write(motor_stop);
     }
   }
 }
 
-int go_to_depth(int target)
+void go_to_depth(int target)
 {
   Serial.print("going to depth "); Serial.println(target);
 
   int speed; 
   int error;
 
-  const int timeout = 20000;
-  unsigned const long start_time = millis();
-
   // while depth is not within 5cm...
-  while (abs(get_depth() - target) > 5 && millis() > start_time + timeout)
+  while (abs(get_depth() - target) > 5)
   {
     long temp_depth = get_depth();
     Serial.print("depth = "); Serial.println(temp_depth);
@@ -129,17 +116,9 @@ int go_to_depth(int target)
       speed = constrain(speed, motor_hover, max_motor_up);
       myservo.write(speed);
     }
-    // how often the motor speed is changed
-    delay(10);
+    delay(20);
   }
-  if (millis() > start_time + timeout) 
-  {
-    Serial.print("going to depth "); Serial.print(target); Serial.println(" unsuccessful"); 
-    return 1;
-  }
-  
   //stopping movement once complete
-  return 0;
   Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
 }
 
@@ -164,8 +143,7 @@ void hover(int temp_target)
         Serial.println("hover complete");
         break;
       }
-      // motor hover
-      myservo.write(80);
+      myservo.write(motor_hover);
     }
     else
     {
@@ -176,26 +154,35 @@ void hover(int temp_target)
       // correcting position
       go_to_depth(temp_target);
     }
-    // how often it checks
-    delay(10);
+    delay(20);
   }
 }
 
-// gets water depth in cm using formula from https://bluerobotics.com/learn/pressure-depth-calculator/
+//gets depth using formula found here https://bluerobotics.com/learn/pressure-depth-calculator/
 float get_depth() 
 {
-  int read = analogRead(pressure); // gets 10 bit voltage
-  float v = read * 5.0 / 1023.0; // gets voltage from analog read
-  float psi = (v - 0.5) * (30.0 / 4.0); // .5 = 0 PSI, 4.5 = 30 PSI, calculates PSI based on voltage 
-  float pascal = psi * 6894.76; // converts psi to pascals
-  float gauge_pressure = pascal - atmospheric pressure; // gets guage pressure for blue robotics formula
-  float depth_meter = gauge_pressure / (997.0474 * 9.80665) // gets water depth in meters based on blue robotics formula, uses fresh water density for pool water
-  return meter * 100; // converts to cm and return
+  int averages[10];
+  for(int i = 0; i < 10; i++)
+  {
+    int sensor_value = analogRead(pressure); // gets analogRead() 10 bit
+    float voltage = sensor_value * (5.0 / 1023.0); // converts the analogRead from 10 bit to voltage
+    voltage = constrain(voltage, 0.5, 4.5); // makes sure it is not below or above range
+    float psi = (voltage - 0.5) * (30.0 / 4.0); // .5V = 0 PSI, 4.5V = 30 PSI.  0-4V, 0-30 PSI
+    float pascal = psi * 6894.757; // converts PSI to pascal for formula
+    float meters = pascal / (997.0474 * 9.80665); // uses freshwater density and gravity from website
+    averages[i] = meters * 100; // stores number in averages
+  }
+  int all = 0; //the sum of all numbers
+  for(int i = 0; i < 10; i++)
+  { 
+    all = all + averages[i];   
+  }
+  return all / 10; // returns average
 }
-  
+
 float get_temperature() 
 {
-  int adcVal = analogRead(temp);
+  int adcVal = analogRead(temp); 
   float v = adcVal * 5.0 / 1023.0;  
   float Rt = 10.0 * v / (5.0 - v); 
   float tempK = 1.0 / (log(Rt / 10.0) / 3950.0 + 1.0 / 298.15); 
@@ -210,5 +197,3 @@ void log_data(float temp_depth, float temp_temp)
   Serial.print(",");
   Serial.println(temp_temp);
 }
-
-
