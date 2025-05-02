@@ -159,7 +159,7 @@ void hover(int temp_target)
 //gets depth using formula found here https://bluerobotics.com/learn/pressure-depth-calculator/
 float get_depth() 
 {
-  long averaged_read = 0.0;
+  float averaged_read = 0.0;
   int readings_num = 20;
   for (int i = 0; i < readings_num; i++)
   {  
@@ -172,7 +172,7 @@ float get_depth()
   float psi = (voltage - 0.5) * (30.0 / 4.0); // .5V = 0 PSI, 4.5V = 30 PSI.  0-4V, 0-30 PSI (gauge_pressure)
   float pascal = psi * 6894.757; // converts PSI to pascal for formula 
   float meters = pascal / (997.0474 * 9.80665); // uses freshwater density and gravity from website
-  return = meters * 100; // stores number in averages
+  return meters * 100; // stores number in averages
 }
 
 float get_temperature() 
