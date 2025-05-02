@@ -9,35 +9,38 @@ const int pressure = A1;
 const int temp = A0;
 const int button = 4;
 const int servo = 9;
-  
+
+// enter pool_depth in cm
+const int pool_depth = 304;
+
 // target depths
 const int target_depths_size = 4;
-const int target_depths[target_depths_size] = {0, 20, 110, 210}; // example numbers if pool is 2.2m deep
+const int target_depths[target_depths_size] = {0, 20, 110, 210}; // example numbers if pool is 2.2m deep, is changed in setup()
   
 // motor values 
 const int motor_stop = 91;
 const int max_motor_down = 63;
 const int max_motor_up = 101;
 const int motor_hover = 79;
-const int max_error_range = 60; // used for map() function as the upper boumd
-
-//atmospheric pressure from https://barometricpressure.today/cities/long-beach-us to calculate gauge pressure in get_depth()
-const int atmospheric_pressure = 101490.0;
+const int max_error_range = 60; // used for map() function as the upper bound
 
 void setup() 
 {
+  target_depths[3] = pool_depth - 40;
+  target_depths[2] = (pool_depth / 2) - 40;
+  
   Serial.begin(9600);
 
-  // set pins
+  // set buttonm pin
   pinMode(button, INPUT_PULLUP);
 
-  // initializing motor
+  // initialize motor
   delay(1000);
   myservo.attach(servo,1000,2000);
   Serial.println("Initializing ESC");
   myservo.write(180);
   delay(5000);
-  myservo.write(91);
+  myservo.write(motor_stop);
   delay(1000);
   Serial.println("ESC Initialized");
   delay(3000);
@@ -46,9 +49,9 @@ void setup()
 void loop() 
 { 
   // waiting for button to be pressed to begin
-  Serial.println("press button to start");
+  Serial.println("press button to start program");
   while (digitalRead(button) == HIGH) {}
-  delay(300);
+  delay(300); // delay to stop one button press accidentally triggering next wait for button press
 
   // goes through every target depth
   for (int i = 0; i < target_depths_size; i++)
@@ -59,7 +62,7 @@ void loop()
       Serial.println("press button again to take air temp");
       while (digitalRead(button) == HIGH) {}
       delay(300);
-      log_data(30, get_temperature());
+      log_data(30, get_temperature()); // taking air temp
       continue;
     }
     // if for loop is on its second iteration, wait for a button press to confirm MATE Float is in water and log data
@@ -68,7 +71,7 @@ void loop()
       Serial.println("press button once MATE Float is in the water");
       while (digitalRead(button) == HIGH) {}
       delay(300);
-      log_data(-20, get_temperature());
+      log_data(-20, get_temperature()); // takes surface temp
       continue;
     }
 
