@@ -116,7 +116,6 @@ void go_to_depth(int target)
       speed = constrain(speed, motor_hover, max_motor_up);
       myservo.write(speed);
     }
-    delay(20);
   }
   //stopping movement once complete
   Serial.print("going to depth "); Serial.print(target); Serial.println(" successful"); 
@@ -134,8 +133,8 @@ void hover(int temp_target)
     long temp_depth = get_depth();
     Serial.print("depth = "); Serial.println(temp_depth);
 
-    // if depth is within 5 cm error, check if countdown should continue
-    if (abs(temp_depth - temp_target) <= 5)
+    // if depth is within 15 cm error, check if countdown should continue depending on time
+    if (abs(temp_depth - temp_target) <= 15)
     {
       // stop motor and break when countdown finished
       if (millis() - start_time >= hover_duration)
@@ -154,30 +153,26 @@ void hover(int temp_target)
       // correcting position
       go_to_depth(temp_target);
     }
-    delay(20);
   }
 }
 
 //gets depth using formula found here https://bluerobotics.com/learn/pressure-depth-calculator/
 float get_depth() 
 {
-  int averages[10];
-  for(int i = 0; i < 10; i++)
-  {
-    int sensor_value = analogRead(pressure); // gets analogRead() 10 bit
-    float voltage = sensor_value * (5.0 / 1023.0); // converts the analogRead from 10 bit to voltage
-    voltage = constrain(voltage, 0.5, 4.5); // makes sure it is not below or above range
-    float psi = (voltage - 0.5) * (30.0 / 4.0); // .5V = 0 PSI, 4.5V = 30 PSI.  0-4V, 0-30 PSI
-    float pascal = psi * 6894.757; // converts PSI to pascal for formula
-    float meters = pascal / (997.0474 * 9.80665); // uses freshwater density and gravity from website
-    averages[i] = meters * 100; // stores number in averages
-  }
-  int all = 0; //the sum of all numbers
-  for(int i = 0; i < 10; i++)
-  { 
-    all = all + averages[i];   
-  }
-  return all / 10; // returns average
+  long averaged_read = 0.0;
+  int readings_num = 20;
+  for (int i = 0; i < readings_num; i++)
+  {  
+    averaged_read += analogRead(pressure); 
+    delay(2);
+  } 
+  averaged_read = averaged_read / readings_num;
+  float voltage = averaged_read * (5.0 / 1023.0); // converts the analogRead from 10 bit to voltage
+  voltage = constrain(voltage, 0.5, 4.5); // makes sure it is not below or above range
+  float psi = (voltage - 0.5) * (30.0 / 4.0); // .5V = 0 PSI, 4.5V = 30 PSI.  0-4V, 0-30 PSI (gauge_pressure)
+  float pascal = psi * 6894.757; // converts PSI to pascal for formula 
+  float meters = pascal / (997.0474 * 9.80665); // uses freshwater density and gravity from website
+  return = meters * 100; // stores number in averages
 }
 
 float get_temperature() 
