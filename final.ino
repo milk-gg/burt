@@ -80,7 +80,7 @@ void loop()
     if (i == target_depths_size - 1)
     {
       Serial.println("ascending to surface...");
-      go_to_depth(5);
+      go_to_depth(20);
       Serial.println("successful");
       myservo.write(motor_stop);
     }
